@@ -1,10 +1,10 @@
 package com.researchmate.mcp.parser;
 
-import com.researchmate.mcp.model.ArxivPaper;
+import com.researchmate.mcp.model.AcademicPaper;
+import com.researchmate.mcp.model.PaperProvider;
 import org.springframework.stereotype.Component;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
-import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -21,9 +21,9 @@ public class ArxivParser {
     private static final String ATOM_NAMESPACE =
             "http://www.w3.org/2005/Atom";
 
-    public List<ArxivPaper> parse(String xml) {
+    public List<AcademicPaper> parse(String xml) {
 
-        List<ArxivPaper> papers = new ArrayList<>();
+        List<AcademicPaper> papers = new ArrayList<>();
 
         try {
             DocumentBuilderFactory factory =
@@ -49,12 +49,17 @@ public class ArxivParser {
 
                 Element entry = (Element) entries.item(i);
 
-                ArxivPaper paper = ArxivPaper.builder()
-                        .arxivId(getText(entry, "id"))
+                AcademicPaper paper = AcademicPaper.builder()
+                        .provider(PaperProvider.ARXIV)
+                        .externalId(getText(entry, "id"))
                         .title(getText(entry, "title"))
                         .abstractText(getText(entry, "summary"))
-                        .publishedAt(parseDate(getText(entry, "published")))
-                        .updatedAt(parseDate(getText(entry, "updated")))
+                        .publishedAt(
+                                parseDate(getText(entry, "published"))
+                        )
+                        .updatedAt(
+                                parseDate(getText(entry, "updated"))
+                        )
                         .authors(getAuthors(entry))
                         .categories(getCategories(entry))
                         .paperUrl(getPaperUrl(entry))
@@ -155,10 +160,19 @@ public class ArxivParser {
 
             String type = link.getAttribute("type");
             String title = link.getAttribute("title");
+            String rel = link.getAttribute("rel");
             String href = link.getAttribute("href");
 
-            if ("text/html".equals(type)
-                    || "abs".equals(title)) {
+            boolean isPaperLink =
+                    "text/html".equalsIgnoreCase(type)
+                            || "abs".equalsIgnoreCase(title)
+                            || (
+                            "alternate".equalsIgnoreCase(rel)
+                                    && href != null
+                                    && href.contains("/abs/")
+                    );
+
+            if (isPaperLink && href != null && !href.isBlank()) {
                 return href;
             }
         }
@@ -180,10 +194,23 @@ public class ArxivParser {
 
             String type = link.getAttribute("type");
             String title = link.getAttribute("title");
+            String rel = link.getAttribute("rel");
             String href = link.getAttribute("href");
 
-            if ("application/pdf".equals(type)
-                    || "pdf".equals(title)) {
+            boolean isPdfLink =
+                    "application/pdf".equalsIgnoreCase(type)
+                            || "pdf".equalsIgnoreCase(title)
+                            || (
+                            "related".equalsIgnoreCase(rel)
+                                    && href != null
+                                    && href.contains("/pdf/")
+                    )
+                            || (
+                            href != null
+                                    && href.contains("/pdf/")
+                    );
+
+            if (isPdfLink && href != null && !href.isBlank()) {
                 return href;
             }
         }
